@@ -132,6 +132,44 @@ export default function AIToolsModal({
   const [mindMapPreview, setMindMapPreview] = useState("");
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingMindMap, setIsGeneratingMindMap] = useState(false);
+  const [mcqPreview, setMcqPreview] = useState("");
+  const [isGeneratingMcq, setIsGeneratingMcq] = useState(false);
+
+  const generateMcq = (content: string): string => {
+    const sentences = content
+      .split(/[\n.!?]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 25)
+      .slice(0, 5);
+
+    if (!sentences.length) return "";
+
+    return sentences
+      .map((sentence, index) => {
+        const words = sentence.split(/\s+/).filter(Boolean);
+        const keyWordIndex = Math.max(
+          1,
+          Math.min(words.length - 2, Math.floor(words.length / 2)),
+        );
+        const answer = words[keyWordIndex];
+        const hiddenSentence = words
+          .map((w, i) => (i === keyWordIndex ? "_____" : w))
+          .join(" ");
+
+        const fallbackDistractors = ["Concept", "Theory", "Process", "System"];
+        const distractors = fallbackDistractors
+          .filter((w) => w.toLowerCase() !== answer.toLowerCase())
+          .slice(0, 3);
+
+        const options = [...distractors, answer]
+          .sort(() => Math.random() - 0.5)
+          .map((opt, i) => `${String.fromCharCode(65 + i)}. ${opt}`)
+          .join("\n");
+
+        return `Q${index + 1}. ${hiddenSentence}\n${options}\nAnswer: ${answer}`;
+      })
+      .join("\n\n");
+  };
 
   const handleGenerateSummary = async () => {
     if (!noteContent.trim()) {
@@ -169,6 +207,29 @@ export default function AIToolsModal({
     toast.success("Summary applied to note!");
   };
 
+  const handleGenerateMcq = async () => {
+    if (!noteContent.trim()) {
+      toast.error("Note is empty. Add some content first.");
+      return;
+    }
+    setIsGeneratingMcq(true);
+    await new Promise((r) => setTimeout(r, 700));
+    const mcq = generateMcq(noteContent);
+    if (!mcq) {
+      toast.error("Could not generate MCQs. Add more detailed content.");
+    } else {
+      setMcqPreview(mcq);
+    }
+    setIsGeneratingMcq(false);
+  };
+
+  const handleInsertMcq = () => {
+    onApplyToNote(`${noteContent}\n\n=== MCQ SET ===\n${mcqPreview}`);
+    setMcqPreview("");
+    onOpenChange(false);
+    toast.success("MCQ set inserted into note!");
+  };
+
   const handleInsertMindMap = () => {
     onApplyToNote(`${noteContent}\n\n${mindMapPreview}`);
     setMindMapPreview("");
@@ -201,6 +262,9 @@ export default function AIToolsModal({
               data-ocid="ai_tools.mindmap_tab"
             >
               🧠 Mind Map
+            </TabsTrigger>
+            <TabsTrigger value="mcq" className="flex-1" data-ocid="ai_tools.mcq_tab">
+              ❓ MCQ
             </TabsTrigger>
           </TabsList>
 
@@ -310,6 +374,63 @@ export default function AIToolsModal({
                     size="sm"
                     onClick={() => setMindMapPreview("")}
                     data-ocid="ai_tools.clear_mindmap_button"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="mcq" className="mt-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Converts your note content (for example, text extracted from a PDF)
+              into quick multiple-choice questions.
+            </p>
+            <Button
+              onClick={handleGenerateMcq}
+              disabled={isGeneratingMcq}
+              className="w-full"
+              data-ocid="ai_tools.generate_mcq_button"
+            >
+              {isGeneratingMcq ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating MCQs...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate MCQ Set
+                </>
+              )}
+            </Button>
+
+            {mcqPreview && (
+              <div className="space-y-3">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Preview
+                </div>
+                <ScrollArea className="h-56 rounded-lg border bg-muted/30 p-3">
+                  <pre className="text-sm font-mono whitespace-pre-wrap leading-6">
+                    {mcqPreview}
+                  </pre>
+                </ScrollArea>
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleInsertMcq}
+                    className="flex-1"
+                    data-ocid="ai_tools.insert_mcq_button"
+                  >
+                    Insert into Note
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMcqPreview("")}
+                    data-ocid="ai_tools.clear_mcq_button"
                   >
                     Clear
                   </Button>
